@@ -1,0 +1,1136 @@
+<!DOCTYPE html>
+<html lang="ru" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Surf Coffee AI — Автономный ИИ-бариста</title>
+  <meta name="description" content="Кейс автоматизации приёма заказов для Surf Coffee: LLM-агент, Python-калькулятор и CRM-интеграция на n8n." />
+  <meta name="theme-color" content="#0A0A0A" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="favicon.svg" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            base: '#0A0A0A',
+            muted: '#9CA3AF',
+            cyan: '#06B6D4',
+            coffee: '#8B6F4E',
+            'coffee-light': '#A68B6A',
+            glass: 'rgba(255, 255, 255, 0.04)',
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+          },
+          boxShadow: {
+            'neon-cyan': '0 0 20px rgba(6, 182, 212, 0.35), 0 0 60px rgba(6, 182, 212, 0.15)',
+            'neon-cyan-lg': '0 0 30px rgba(6, 182, 212, 0.5), 0 0 80px rgba(6, 182, 212, 0.25)',
+            'glass': '0 8px 32px rgba(0, 0, 0, 0.4)',
+          },
+          animation: {
+            'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'float': 'float 6s ease-in-out infinite',
+            'glow': 'glow 3s ease-in-out infinite alternate',
+          },
+          keyframes: {
+            float: {
+              '0%, 100%': { transform: 'translateY(0px)' },
+              '50%': { transform: 'translateY(-12px)' },
+            },
+            glow: {
+              '0%': { opacity: '0.4' },
+              '100%': { opacity: '0.8' },
+            },
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    body {
+      background-color: #0A0A0A;
+      background-image:
+        radial-gradient(ellipse 80% 60% at 50% -10%, rgba(6, 182, 212, 0.12) 0%, transparent 55%),
+        radial-gradient(ellipse 60% 50% at 90% 80%, rgba(139, 111, 78, 0.08) 0%, transparent 50%),
+        radial-gradient(ellipse 50% 40% at 10% 60%, rgba(6, 182, 212, 0.06) 0%, transparent 45%);
+    }
+
+    .glass-card {
+      background: rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .glass-card:hover {
+      border-color: rgba(6, 182, 212, 0.2);
+      background: rgba(255, 255, 255, 0.045);
+    }
+
+    .neon-text {
+      text-shadow: 0 0 40px rgba(6, 182, 212, 0.4), 0 0 80px rgba(6, 182, 212, 0.15);
+    }
+
+    .gradient-border {
+      position: relative;
+    }
+
+    .gradient-border::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      padding: 1px;
+      background: linear-gradient(135deg, rgba(6, 182, 212, 0.4), rgba(139, 111, 78, 0.3), rgba(6, 182, 212, 0.1));
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
+    }
+
+    .screenshot-placeholder {
+      background:
+        linear-gradient(135deg, rgba(6, 182, 212, 0.03) 0%, transparent 50%),
+        linear-gradient(225deg, rgba(139, 111, 78, 0.05) 0%, transparent 50%),
+        repeating-linear-gradient(
+          0deg,
+          transparent,
+          transparent 24px,
+          rgba(255, 255, 255, 0.015) 24px,
+          rgba(255, 255, 255, 0.015) 25px
+        ),
+        repeating-linear-gradient(
+          90deg,
+          transparent,
+          transparent 24px,
+          rgba(255, 255, 255, 0.015) 24px,
+          rgba(255, 255, 255, 0.015) 25px
+        );
+    }
+
+    .btn-neon {
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .btn-neon:hover {
+      box-shadow: 0 0 30px rgba(6, 182, 212, 0.5), 0 0 80px rgba(6, 182, 212, 0.25), inset 0 0 20px rgba(6, 182, 212, 0.1);
+      transform: translateY(-2px);
+    }
+
+    .btn-cta {
+      font-size: 0.95rem;
+      letter-spacing: 0.18em;
+      padding: 1.35rem 2.75rem;
+      border-width: 2px;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    @media (min-width: 640px) {
+      .btn-cta {
+        font-size: 1.05rem;
+        padding: 1.6rem 3.5rem;
+      }
+    }
+
+    .btn-cta:hover {
+      animation: cta-neon-pulse 1.4s ease-in-out infinite;
+      transform: translateY(-3px) scale(1.02);
+      border-color: rgba(6, 182, 212, 0.85);
+      background: linear-gradient(135deg, rgba(6, 182, 212, 0.35), rgba(6, 182, 212, 0.12));
+    }
+
+    @keyframes cta-neon-pulse {
+      0%, 100% {
+        box-shadow: 0 0 20px rgba(6, 182, 212, 0.4), 0 0 50px rgba(6, 182, 212, 0.15), inset 0 0 24px rgba(6, 182, 212, 0.08);
+      }
+      50% {
+        box-shadow: 0 0 40px rgba(6, 182, 212, 0.75), 0 0 100px rgba(6, 182, 212, 0.35), 0 0 160px rgba(6, 182, 212, 0.12), inset 0 0 36px rgba(6, 182, 212, 0.15);
+      }
+    }
+
+    .step-card {
+      transition: border-color 0.35s ease, background 0.35s ease, transform 0.35s ease, box-shadow 0.35s ease;
+    }
+
+    .step-card:hover {
+      border-color: rgba(6, 182, 212, 0.25);
+      background: rgba(255, 255, 255, 0.055);
+      transform: translateY(-4px);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35), 0 0 24px rgba(6, 182, 212, 0.08);
+    }
+
+    /* --- ROI calculator --- */
+    .roi-widget {
+      background: rgba(255, 255, 255, 0.035);
+      border: 1px solid rgba(6, 182, 212, 0.2);
+      box-shadow: 0 0 40px rgba(6, 182, 212, 0.08), 0 20px 60px rgba(0, 0, 0, 0.4);
+    }
+
+    .roi-stat {
+      background: rgba(6, 182, 212, 0.06);
+      border: 1px solid rgba(6, 182, 212, 0.25);
+      box-shadow: 0 0 30px rgba(6, 182, 212, 0.12), inset 0 0 20px rgba(6, 182, 212, 0.04);
+      transition: box-shadow 0.4s ease, border-color 0.4s ease;
+    }
+
+    .roi-stat:hover {
+      border-color: rgba(6, 182, 212, 0.45);
+      box-shadow: 0 0 40px rgba(6, 182, 212, 0.25), inset 0 0 28px rgba(6, 182, 212, 0.08);
+    }
+
+    .roi-value {
+      text-shadow: 0 0 30px rgba(6, 182, 212, 0.5), 0 0 60px rgba(6, 182, 212, 0.2);
+      transition: transform 0.3s ease;
+    }
+
+    .roi-value.bump { transform: scale(1.04); }
+
+    .roi-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 999px;
+      background: linear-gradient(to right, #06b6d4 var(--roi-pct, 8%), rgba(255,255,255,0.08) var(--roi-pct, 8%));
+      outline: none;
+      cursor: pointer;
+    }
+
+    .roi-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #06b6d4;
+      border: 3px solid #0a0a0a;
+      box-shadow: 0 0 16px rgba(6, 182, 212, 0.6);
+      cursor: pointer;
+      transition: box-shadow 0.2s ease, transform 0.2s ease;
+    }
+
+    .roi-slider::-webkit-slider-thumb:hover {
+      box-shadow: 0 0 24px rgba(6, 182, 212, 0.9);
+      transform: scale(1.1);
+    }
+
+    .roi-slider::-moz-range-thumb {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #06b6d4;
+      border: 3px solid #0a0a0a;
+      box-shadow: 0 0 16px rgba(6, 182, 212, 0.6);
+      cursor: pointer;
+    }
+
+    /* --- FAQ accordion --- */
+    .faq-item { transition: border-color 0.3s ease, background 0.3s ease; }
+    .faq-item.open { border-color: rgba(6, 182, 212, 0.25); background: rgba(255, 255, 255, 0.045); }
+
+    .faq-trigger { cursor: pointer; }
+    .faq-icon { transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1); }
+    .faq-item.open .faq-icon { transform: rotate(180deg); }
+
+    .faq-panel {
+      display: grid;
+      grid-template-rows: 0fr;
+      transition: grid-template-rows 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .faq-item.open .faq-panel { grid-template-rows: 1fr; }
+
+    .faq-panel-inner { overflow: hidden; }
+
+    .nav-blur {
+      background: rgba(10, 10, 10, 0.7);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+
+    ::selection {
+      background: rgba(6, 182, 212, 0.3);
+      color: #fff;
+    }
+
+    .dot-grid {
+      background-image: radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+      background-size: 24px 24px;
+    }
+
+    /* --- Code editor panels --- */
+    .code-panel {
+      background: #0d0d0d;
+      font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
+      font-size: 11px;
+      line-height: 1.65;
+      overflow: auto;
+    }
+
+    @media (min-width: 640px) {
+      .code-panel { font-size: 12px; }
+    }
+
+    .code-panel::-webkit-scrollbar { width: 6px; height: 6px; }
+    .code-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
+
+    .code-line {
+      display: flex;
+      padding: 0 12px 0 0;
+      transition: background 0.15s ease;
+    }
+
+    .code-line:hover { background: rgba(6, 182, 212, 0.04); }
+
+    .line-num {
+      flex-shrink: 0;
+      width: 2.5rem;
+      text-align: right;
+      padding-right: 12px;
+      color: rgba(255, 255, 255, 0.18);
+      user-select: none;
+      border-right: 1px solid rgba(255, 255, 255, 0.05);
+      margin-right: 12px;
+    }
+
+    .line-body { flex: 1; white-space: pre; overflow-x: auto; }
+
+    .syn-kw   { color: #c792ea; }
+    .syn-fn   { color: #82aaff; }
+    .syn-str  { color: #c3e88d; }
+    .syn-num  { color: #f78c6c; }
+    .syn-cmt  { color: #546e7a; font-style: italic; }
+    .syn-key  { color: #82aaff; }
+    .syn-val  { color: #c3e88d; }
+    .syn-brk  { color: #89ddff; }
+    .syn-bool { color: #ffcb6b; }
+    .syn-rcpt { color: #e2e8f0; }
+    .syn-ico  { color: inherit; }
+    .syn-hl   { color: #06b6d4; font-weight: 600; }
+    .syn-tot  { color: #a68b6a; font-weight: 700; }
+
+    /* --- n8n flow diagram --- */
+    .flow-canvas {
+      background:
+        radial-gradient(circle at 20% 30%, rgba(6, 182, 212, 0.06) 0%, transparent 50%),
+        radial-gradient(circle at 80% 70%, rgba(139, 111, 78, 0.06) 0%, transparent 50%),
+        #080808;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .flow-canvas::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px);
+      background-size: 20px 20px;
+      pointer-events: none;
+    }
+
+    .flow-grid {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      padding: 24px 16px;
+      min-height: 280px;
+      position: relative;
+      z-index: 1;
+    }
+
+    @media (min-width: 640px) {
+      .flow-grid {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 0 8px;
+        padding: 32px 24px;
+        min-height: 320px;
+      }
+    }
+
+    .flow-node {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 14px 18px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.04);
+      min-width: 120px;
+      cursor: default;
+      transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+    }
+
+    .flow-node:hover {
+      transform: translateY(-4px) scale(1.03);
+      border-color: var(--node-color, rgba(6, 182, 212, 0.5));
+      background: rgba(255, 255, 255, 0.07);
+      box-shadow: 0 0 24px var(--node-glow, rgba(6, 182, 212, 0.25)), 0 8px 32px rgba(0,0,0,0.4);
+    }
+
+    .flow-node.active {
+      border-color: var(--node-color, rgba(6, 182, 212, 0.6));
+      box-shadow: 0 0 20px var(--node-glow, rgba(6, 182, 212, 0.2));
+    }
+
+    .flow-node-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      background: var(--node-bg, rgba(6, 182, 212, 0.12));
+    }
+
+    .flow-node-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.9);
+      text-align: center;
+      line-height: 1.3;
+    }
+
+    .flow-node-sub {
+      font-size: 9px;
+      color: rgba(255, 255, 255, 0.35);
+      text-align: center;
+      font-family: ui-monospace, monospace;
+    }
+
+    .flow-arrow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: rgba(6, 182, 212, 0.4);
+      padding: 6px 0;
+      transition: color 0.3s ease;
+    }
+
+    .flow-arrow svg {
+      width: 20px;
+      height: 20px;
+      animation: flow-pulse 2s ease-in-out infinite;
+    }
+
+    @media (min-width: 640px) {
+      .flow-arrow {
+        padding: 0 4px;
+        transform: rotate(-90deg);
+      }
+      .flow-arrow svg { width: 24px; height: 24px; }
+    }
+
+    @keyframes flow-pulse {
+      0%, 100% { opacity: 0.35; transform: translateY(0); }
+      50% { opacity: 1; transform: translateY(3px); }
+    }
+
+    @media (min-width: 640px) {
+      @keyframes flow-pulse {
+        0%, 100% { opacity: 0.35; transform: translateX(0); }
+        50% { opacity: 1; transform: translateX(3px); }
+      }
+    }
+
+    .flow-node:hover + .flow-arrow,
+    .flow-arrow:hover { color: rgba(6, 182, 212, 0.9); }
+
+    .flow-badge {
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      font-size: 8px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      padding: 2px 6px;
+      border-radius: 6px;
+      background: rgba(6, 182, 212, 0.2);
+      color: #06b6d4;
+      border: 1px solid rgba(6, 182, 212, 0.3);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .flow-node:hover .flow-badge { opacity: 1; }
+
+    /* --- Accent effects --- */
+    .badge-glow {
+      animation: badge-shimmer 3s ease-in-out infinite;
+      box-shadow: 0 0 20px rgba(6, 182, 212, 0.15), inset 0 0 12px rgba(6, 182, 212, 0.05);
+    }
+
+    @keyframes badge-shimmer {
+      0%, 100% { box-shadow: 0 0 16px rgba(6, 182, 212, 0.12), inset 0 0 10px rgba(6, 182, 212, 0.04); }
+      50% { box-shadow: 0 0 28px rgba(6, 182, 212, 0.35), inset 0 0 16px rgba(6, 182, 212, 0.08); }
+    }
+
+    .reveal {
+      opacity: 0;
+      transform: translateY(28px);
+      transition: opacity 0.7s cubic-bezier(0.4, 0, 0.2, 1), transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(ellipse 50% 40% at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(6, 182, 212, 0.04) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+      transition: background 0.3s ease;
+    }
+
+    body > * { position: relative; z-index: 1; }
+  </style>
+</head>
+<body class="font-sans text-white antialiased overflow-x-hidden">
+
+  <!-- Navigation -->
+  <nav class="fixed top-0 left-0 right-0 z-50 nav-blur border-b border-white/[0.06]">
+    <div class="max-w-7xl mx-auto px-5 sm:px-8 lg:px-12 h-16 flex items-center justify-between">
+      <a href="#" class="flex items-center gap-2.5 group">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan/30 to-coffee/30 border border-white/10 flex items-center justify-center group-hover:border-cyan/40 transition-colors">
+          <svg class="w-4 h-4 text-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        </div>
+        <span class="text-sm font-semibold tracking-wide text-white/90">Surf Coffee <span class="text-cyan">AI</span></span>
+      </a>
+      <div class="hidden sm:flex items-center gap-8">
+        <a href="#architecture" class="text-xs font-medium text-muted hover:text-cyan transition-colors tracking-wide uppercase">Архитектура</a>
+        <a href="#logs" class="text-xs font-medium text-muted hover:text-cyan transition-colors tracking-wide uppercase">Модули</a>
+        <a href="#process" class="text-xs font-medium text-muted hover:text-cyan transition-colors tracking-wide uppercase">Этапы</a>
+        <a href="#roi" class="text-xs font-medium text-muted hover:text-cyan transition-colors tracking-wide uppercase">ROI</a>
+        <a href="#faq" class="text-xs font-medium text-muted hover:text-cyan transition-colors tracking-wide uppercase">FAQ</a>
+        <div class="flex items-center gap-3">
+          <span class="text-xs font-medium text-muted tracking-wide uppercase">Связаться</span>
+          <a href="https://t.me/nstnoiree" target="_blank" rel="noopener noreferrer" class="text-xs font-medium text-cyan hover:text-white transition-colors tracking-wide uppercase">Telegram</a>
+          <span class="text-white/20">·</span>
+          <a href="https://kwork.ru/user/nstrvv" target="_blank" rel="noopener noreferrer" class="text-xs font-medium text-cyan hover:text-white transition-colors tracking-wide uppercase">Kwork</a>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 1. HERO -->
+  <header class="relative min-h-screen flex items-center pt-16">
+    <div class="absolute inset-0 dot-grid opacity-40 pointer-events-none"></div>
+    <div class="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-cyan/5 rounded-full blur-[120px] animate-pulse-slow pointer-events-none"></div>
+    <div class="absolute bottom-1/4 right-0 w-[400px] h-[400px] bg-coffee/5 rounded-full blur-[100px] pointer-events-none"></div>
+
+    <div class="relative max-w-7xl mx-auto px-5 sm:px-8 lg:px-12 py-20 lg:py-32 w-full">
+      <div class="max-w-4xl">
+        <div class="badge-glow inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass-card text-xs font-medium text-cyan mb-8 tracking-wider uppercase">
+          <span class="w-1.5 h-1.5 rounded-full bg-cyan animate-pulse"></span>
+          AI Case Study · 2026
+        </div>
+
+        <h1 class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold leading-[1.08] tracking-tight mb-8">
+          <span class="block text-white neon-text">КЕЙС:</span>
+          <span class="block bg-gradient-to-r from-white via-white to-cyan/80 bg-clip-text text-transparent mt-1">
+            АВТОНОМНЫЙ ИИ-БАРИСТА
+          </span>
+          <span class="block text-coffee-light mt-2 text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-semibold tracking-wide">
+            ДЛЯ SURF COFFEE
+          </span>
+        </h1>
+
+        <p class="text-base sm:text-lg lg:text-xl text-muted leading-relaxed max-w-2xl mb-12 font-light">
+          Автоматизация приёма заказов через LLM, кастомный калькулятор на Python
+          и сквозная CRM-интеграция на платформе n8n
+        </p>
+
+        <div class="flex flex-col sm:flex-row gap-4">
+          <a href="#architecture"
+             class="btn-neon inline-flex items-center justify-center gap-2.5 px-8 py-4 rounded-2xl bg-cyan/10 border border-cyan/30 text-cyan font-semibold text-sm tracking-wide uppercase hover:bg-cyan/20 hover:border-cyan/50">
+            Смотреть архитектуру
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+            </svg>
+          </a>
+          <div class="flex items-center gap-6 px-6 py-4">
+            <div>
+              <div class="text-2xl font-bold text-white">24/7</div>
+              <div class="text-xs text-muted uppercase tracking-wider">Приём заказов</div>
+            </div>
+            <div class="w-px h-10 bg-white/10"></div>
+            <div>
+              <div class="text-2xl font-bold text-white">−10%</div>
+              <div class="text-xs text-muted uppercase tracking-wider">Авто-скидка</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="absolute bottom-8 left-1/2 -translate-x-1/2 animate-float">
+      <div class="w-6 h-10 rounded-full border-2 border-white/20 flex items-start justify-center p-1.5">
+        <div class="w-1 h-2.5 bg-cyan/60 rounded-full animate-pulse"></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- 2. ARCHITECTURE -->
+  <section id="architecture" class="reveal relative py-24 lg:py-32">
+    <div class="max-w-7xl mx-auto px-5 sm:px-8 lg:px-12">
+      <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-16">
+        <div>
+          <p class="text-cyan text-xs font-semibold tracking-[0.2em] uppercase mb-4">02 · Система</p>
+          <h2 class="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-white">
+            Архитектура системы
+          </h2>
+        </div>
+        <p class="text-muted text-sm lg:text-base max-w-md lg:text-right font-light">
+          Сквозной pipeline от сообщения в Telegram до записи в CRM
+        </p>
+      </div>
+
+      <div class="grid lg:grid-cols-5 gap-8 lg:gap-12 items-start">
+        <!-- Screenshot placeholder -->
+        <div class="lg:col-span-3 gradient-border rounded-3xl">
+          <div class="glass-card rounded-3xl overflow-hidden shadow-glass">
+            <div class="flex items-center gap-2 px-5 py-3.5 border-b border-white/[0.06] bg-white/[0.02]">
+              <div class="flex gap-1.5">
+                <span class="w-3 h-3 rounded-full bg-white/10"></span>
+                <span class="w-3 h-3 rounded-full bg-white/10"></span>
+                <span class="w-3 h-3 rounded-full bg-white/10"></span>
+              </div>
+              <span class="text-xs text-muted ml-3 font-mono">n8n · workflow canvas</span>
+            </div>
+            <div class="flow-canvas aspect-[16/10] min-h-[280px] sm:min-h-[360px]">
+              <div class="flow-grid h-full">
+                <div class="flow-node active" style="--node-color: rgba(41,168,238,0.6); --node-glow: rgba(41,168,238,0.3); --node-bg: rgba(41,168,238,0.15);">
+                  <span class="flow-badge">TRIGGER</span>
+                  <div class="flow-node-icon">✈️</div>
+                  <span class="flow-node-label">Telegram</span>
+                  <span class="flow-node-sub">Webhook · onMessage</span>
+                </div>
+                <div class="flow-arrow" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m0 0l-6-6m6 6l6-6"/></svg>
+                </div>
+                <div class="flow-node" style="--node-color: rgba(6,182,212,0.6); --node-glow: rgba(6,182,212,0.3); --node-bg: rgba(6,182,212,0.12);">
+                  <span class="flow-badge">AI</span>
+                  <div class="flow-node-icon">🤖</div>
+                  <span class="flow-node-label">LLM Agent</span>
+                  <span class="flow-node-sub">OpenRouter · Memory</span>
+                </div>
+                <div class="flow-arrow" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m0 0l-6-6m6 6l6-6"/></svg>
+                </div>
+                <div class="flow-node" style="--node-color: rgba(166,139,106,0.6); --node-glow: rgba(166,139,106,0.3); --node-bg: rgba(166,139,106,0.15);">
+                  <span class="flow-badge">CODE</span>
+                  <div class="flow-node-icon">🐍</div>
+                  <span class="flow-node-label">Python</span>
+                  <span class="flow-node-sub">calculator.py</span>
+                </div>
+                <div class="flow-arrow" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m0 0l-6-6m6 6l6-6"/></svg>
+                </div>
+                <div class="flow-node" style="--node-color: rgba(34,197,94,0.6); --node-glow: rgba(34,197,94,0.3); --node-bg: rgba(34,197,94,0.12);">
+                  <span class="flow-badge">SYNC</span>
+                  <div class="flow-node-icon">📊</div>
+                  <span class="flow-node-label">CRM</span>
+                  <span class="flow-node-sub">Order · Notify</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Description -->
+        <div class="lg:col-span-2 space-y-6">
+          <div class="glass-card rounded-2xl p-6 lg:p-8">
+            <h3 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <span class="w-1 h-5 bg-cyan rounded-full"></span>
+              Логика автоматизации
+            </h3>
+            <p class="text-white text-sm lg:text-base leading-relaxed font-light">
+              Логика автоматизации на <span class="text-cyan">n8n</span>. Входящий поток сообщений из
+              <span class="text-cyan">Telegram</span> обрабатывается ИИ-агентом через
+              <span class="text-cyan">OpenRouter</span> с удержанием памяти диалога. Агент распознаёт
+              намерение клиента, уточняет состав заказа и передаёт структурированные данные в Python-модуль
+              для расчёта стоимости.
+            </p>
+          </div>
+
+          <div class="space-y-3">
+            <div class="flex items-start gap-4 p-4 rounded-xl border border-white/[0.05] bg-white/[0.02] hover:border-cyan/15 transition-colors">
+              <div class="w-8 h-8 rounded-lg bg-cyan/10 flex items-center justify-center shrink-0 mt-0.5">
+                <span class="text-cyan text-xs font-bold">01</span>
+              </div>
+              <div>
+                <h4 class="text-sm font-medium text-white mb-1">Telegram Trigger</h4>
+                <p class="text-xs text-muted leading-relaxed">Приём входящих сообщений и callback-кнопок</p>
+              </div>
+            </div>
+            <div class="flex items-start gap-4 p-4 rounded-xl border border-white/[0.05] bg-white/[0.02] hover:border-cyan/15 transition-colors">
+              <div class="w-8 h-8 rounded-lg bg-coffee/10 flex items-center justify-center shrink-0 mt-0.5">
+                <span class="text-coffee-light text-xs font-bold">02</span>
+              </div>
+              <div>
+                <h4 class="text-sm font-medium text-white mb-1">LLM Agent + Memory</h4>
+                <p class="text-xs text-muted leading-relaxed">OpenRouter, контекст диалога, intent parsing</p>
+              </div>
+            </div>
+            <div class="flex items-start gap-4 p-4 rounded-xl border border-white/[0.05] bg-white/[0.02] hover:border-cyan/15 transition-colors">
+              <div class="w-8 h-8 rounded-lg bg-cyan/10 flex items-center justify-center shrink-0 mt-0.5">
+                <span class="text-cyan text-xs font-bold">03</span>
+              </div>
+              <div>
+                <h4 class="text-sm font-medium text-white mb-1">CRM Sync</h4>
+                <p class="text-xs text-muted leading-relaxed">Запись заказа, статус и уведомление бариста</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Divider -->
+  <div class="max-w-7xl mx-auto px-5 sm:px-8 lg:px-12">
+    <div class="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+  </div>
+
+  <!-- 3. LOGS & PYTHON -->
+  <section id="logs" class="reveal relative py-24 lg:py-32">
+    <div class="max-w-7xl mx-auto px-5 sm:px-8 lg:px-12">
+      <div class="text-center mb-16">
+        <p class="text-cyan text-xs font-semibold tracking-[0.2em] uppercase mb-4">03 · Реализация</p>
+        <h2 class="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-white mb-6">
+          Лог работы и Python-модуль
+        </h2>
+        <p class="text-muted text-sm sm:text-base max-w-2xl mx-auto font-light leading-relaxed">
+          Автономный скрипт на Python внутри ноды Code рассчитывает стоимость позиций,
+          доплаты за объёмы, сиропы и применяет скидку 10% для постоянных клиентов —
+          возвращая чистый JSON для Telegram и CRM.
+        </p>
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-6 lg:gap-8">
+        <!-- Python code screenshot -->
+        <div class="gradient-border rounded-3xl group">
+          <div class="glass-card rounded-3xl overflow-hidden shadow-glass h-full transition-all duration-500 group-hover:shadow-neon-cyan">
+            <div class="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.06] bg-white/[0.02]">
+              <div class="flex items-center gap-2">
+                <div class="flex gap-1.5">
+                  <span class="w-3 h-3 rounded-full bg-red-500/40"></span>
+                  <span class="w-3 h-3 rounded-full bg-yellow-500/40"></span>
+                  <span class="w-3 h-3 rounded-full bg-green-500/40"></span>
+                </div>
+                <span class="text-xs text-muted ml-2 font-mono">calculator.py · Cursor</span>
+              </div>
+              <span class="text-[10px] px-2 py-0.5 rounded-md bg-coffee/10 text-coffee-light font-mono">Python</span>
+            </div>
+            <div class="code-panel aspect-[4/3] min-h-[260px] py-3">
+              <div class="code-line"><span class="line-num">1</span><span class="line-body"><span class="syn-cmt"># calculator.py — вывод чека для бариста</span></span></div>
+              <div class="code-line"><span class="line-num">2</span><span class="line-body"><span class="syn-fn">receipt</span> <span class="syn-brk">=</span> <span class="syn-fn">build_receipt</span><span class="syn-brk">(</span>order<span class="syn-brk">)</span></span></div>
+              <div class="code-line"><span class="line-num">3</span><span class="line-body"><span class="syn-kw">return</span> <span class="syn-brk">{</span><span class="syn-str">'json'</span><span class="syn-brk">:</span> receipt<span class="syn-brk">}</span></span></div>
+              <div class="code-line"><span class="line-num">4</span><span class="line-body"></span></div>
+              <div class="code-line"><span class="line-num">5</span><span class="line-body"><span class="syn-cmt"># ── stdout: текстовый чек ──</span></span></div>
+              <div class="code-line"><span class="line-num">6</span><span class="line-body"><span class="syn-rcpt">╔══════════════════════════════════════════╗</span></span></div>
+              <div class="code-line"><span class="line-num">7</span><span class="line-body"><span class="syn-rcpt">║</span>           <span class="syn-hl">SURF COFFEE</span>                <span class="syn-rcpt">║</span></span></div>
+              <div class="code-line"><span class="line-num">8</span><span class="line-body"><span class="syn-rcpt">║</span>            <span class="syn-hl">ЧЕК ЗАКАЗА</span>                 <span class="syn-rcpt">║</span></span></div>
+              <div class="code-line"><span class="line-num">9</span><span class="line-body"><span class="syn-rcpt">╚══════════════════════════════════════════╝</span></span></div>
+              <div class="code-line"><span class="line-num">10</span><span class="line-body"></span></div>
+              <div class="code-line"><span class="line-num">11</span><span class="line-body"><span class="syn-rcpt">Позиций в заказе: 4</span></span></div>
+              <div class="code-line"><span class="line-num">12</span><span class="line-body"><span class="syn-rcpt">Клиент: постоянный (скидка 10%)</span></span></div>
+              <div class="code-line"><span class="line-num">13</span><span class="line-body"></span></div>
+              <div class="code-line"><span class="line-num">14</span><span class="line-body"><span class="syn-ico">☕</span> <span class="syn-hl">КОФЕ</span></span></div>
+              <div class="code-line"><span class="line-num">15</span><span class="line-body"><span class="syn-rcpt">──────────────────────────────────────────</span></span></div>
+              <div class="code-line"><span class="line-num">16</span><span class="line-body"><span class="syn-rcpt">  Фирменный капучино</span>              <span class="syn-num">220 руб.</span></span></div>
+              <div class="code-line"><span class="line-num">17</span><span class="line-body"><span class="syn-rcpt">  Латте Сингапур</span>                  <span class="syn-num">280 руб.</span></span></div>
+              <div class="code-line"><span class="line-num">18</span><span class="line-body"></span></div>
+              <div class="code-line"><span class="line-num">19</span><span class="line-body"><span class="syn-ico">🍰</span> <span class="syn-hl">ДЕСЕРТЫ</span></span></div>
+              <div class="code-line"><span class="line-num">20</span><span class="line-body"><span class="syn-rcpt">──────────────────────────────────────────</span></span></div>
+              <div class="code-line"><span class="line-num">21</span><span class="line-body"><span class="syn-rcpt">  Круассан</span>                        <span class="syn-num">140 руб.</span></span></div>
+              <div class="code-line"><span class="line-num">22</span><span class="line-body"></span></div>
+              <div class="code-line"><span class="line-num">23</span><span class="line-body"><span class="syn-ico">🍵</span> <span class="syn-hl">ЧАЙ</span></span></div>
+              <div class="code-line"><span class="line-num">24</span><span class="line-body"><span class="syn-rcpt">──────────────────────────────────────────</span></span></div>
+              <div class="code-line"><span class="line-num">25</span><span class="line-body"><span class="syn-rcpt">  Чай жасмин</span>                      <span class="syn-num">180 руб.</span></span></div>
+              <div class="code-line"><span class="line-num">26</span><span class="line-body"></span></div>
+              <div class="code-line"><span class="line-num">27</span><span class="line-body"><span class="syn-rcpt">──────────────────────────────────────────</span></span></div>
+              <div class="code-line"><span class="line-num">28</span><span class="line-body"><span class="syn-rcpt">Сумма:</span>                            <span class="syn-num">820 руб.</span></span></div>
+              <div class="code-line"><span class="line-num">29</span><span class="line-body"><span class="syn-rcpt">Скидка 10%:</span>                       <span class="syn-num">-82 руб.</span></span></div>
+              <div class="code-line"><span class="line-num">30</span><span class="line-body"><span class="syn-rcpt">══════════════════════════════════════════</span></span></div>
+              <div class="code-line"><span class="line-num">31</span><span class="line-body"><span class="syn-tot">ИТОГО К ОПЛАТЕ:</span>                  <span class="syn-tot">738 руб.</span></span></div>
+              <div class="code-line"><span class="line-num">32</span><span class="line-body"><span class="syn-rcpt">══════════════════════════════════════════</span></span></div>
+              <div class="code-line"><span class="line-num">33</span><span class="line-body"></span></div>
+              <div class="code-line"><span class="line-num">34</span><span class="line-body"><span class="syn-rcpt">Спасибо, что выбрали Surf Coffee! </span><span class="syn-ico">☕</span></span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Telegram JSON screenshot -->
+        <div class="gradient-border rounded-3xl group">
+          <div class="glass-card rounded-3xl overflow-hidden shadow-glass h-full transition-all duration-500 group-hover:shadow-neon-cyan">
+            <div class="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.06] bg-white/[0.02]">
+              <div class="flex items-center gap-2">
+                <div class="flex gap-1.5">
+                  <span class="w-3 h-3 rounded-full bg-red-500/40"></span>
+                  <span class="w-3 h-3 rounded-full bg-yellow-500/40"></span>
+                  <span class="w-3 h-3 rounded-full bg-green-500/40"></span>
+                </div>
+                <span class="text-xs text-muted ml-2 font-mono">response.json · Telegram</span>
+              </div>
+              <span class="text-[10px] px-2 py-0.5 rounded-md bg-cyan/10 text-cyan font-mono">JSON</span>
+            </div>
+            <div class="code-panel aspect-[4/3] min-h-[260px] py-3">
+              <div class="code-line"><span class="line-num">1</span><span class="line-body"><span class="syn-brk">{</span></span></div>
+              <div class="code-line"><span class="line-num">2</span><span class="line-body">  <span class="syn-key">"order_id"</span><span class="syn-brk">:</span> <span class="syn-str">"SC-0847"</span><span class="syn-brk">,</span></span></div>
+              <div class="code-line"><span class="line-num">3</span><span class="line-body">  <span class="syn-key">"status"</span><span class="syn-brk">:</span> <span class="syn-str">"confirmed"</span><span class="syn-brk">,</span></span></div>
+              <div class="code-line"><span class="line-num">4</span><span class="line-body">  <span class="syn-key">"is_regular"</span><span class="syn-brk">:</span> <span class="syn-bool">true</span><span class="syn-brk">,</span></span></div>
+              <div class="code-line"><span class="line-num">5</span><span class="line-body">  <span class="syn-key">"positions_count"</span><span class="syn-brk">:</span> <span class="syn-num">4</span><span class="syn-brk">,</span></span></div>
+              <div class="code-line"><span class="line-num">6</span><span class="line-body">  <span class="syn-key">"items"</span><span class="syn-brk">: [</span></span></div>
+              <div class="code-line"><span class="line-num">7</span><span class="line-body">    <span class="syn-brk">{</span> <span class="syn-key">"name"</span><span class="syn-brk">:</span> <span class="syn-str">"Фирменный капучино"</span><span class="syn-brk">,</span> <span class="syn-key">"qty"</span><span class="syn-brk">:</span> <span class="syn-num">1</span><span class="syn-brk">,</span> <span class="syn-key">"price"</span><span class="syn-brk">:</span> <span class="syn-num">220</span> <span class="syn-brk">},</span></span></div>
+              <div class="code-line"><span class="line-num">8</span><span class="line-body">    <span class="syn-brk">{</span> <span class="syn-key">"name"</span><span class="syn-brk">:</span> <span class="syn-str">"Латте Сингапур"</span><span class="syn-brk">,</span>    <span class="syn-key">"qty"</span><span class="syn-brk">:</span> <span class="syn-num">1</span><span class="syn-brk">,</span> <span class="syn-key">"price"</span><span class="syn-brk">:</span> <span class="syn-num">280</span> <span class="syn-brk">},</span></span></div>
+              <div class="code-line"><span class="line-num">9</span><span class="line-body">    <span class="syn-brk">{</span> <span class="syn-key">"name"</span><span class="syn-brk">:</span> <span class="syn-str">"Круассан"</span><span class="syn-brk">,</span>           <span class="syn-key">"qty"</span><span class="syn-brk">:</span> <span class="syn-num">1</span><span class="syn-brk">,</span> <span class="syn-key">"price"</span><span class="syn-brk">:</span> <span class="syn-num">140</span> <span class="syn-brk">},</span></span></div>
+              <div class="code-line"><span class="line-num">10</span><span class="line-body">    <span class="syn-brk">{</span> <span class="syn-key">"name"</span><span class="syn-brk">:</span> <span class="syn-str">"Чай жасмин"</span><span class="syn-brk">,</span>         <span class="syn-key">"qty"</span><span class="syn-brk">:</span> <span class="syn-num">1</span><span class="syn-brk">,</span> <span class="syn-key">"price"</span><span class="syn-brk">:</span> <span class="syn-num">180</span> <span class="syn-brk">}</span></span></div>
+              <div class="code-line"><span class="line-num">11</span><span class="line-body">  <span class="syn-brk">],</span></span></div>
+              <div class="code-line"><span class="line-num">12</span><span class="line-body">  <span class="syn-key">"subtotal"</span><span class="syn-brk">:</span> <span class="syn-num">820</span><span class="syn-brk">,</span></span></div>
+              <div class="code-line"><span class="line-num">13</span><span class="line-body">  <span class="syn-key">"discount"</span><span class="syn-brk">:</span> <span class="syn-num">82</span><span class="syn-brk">,</span></span></div>
+              <div class="code-line"><span class="line-num">14</span><span class="line-body">  <span class="syn-key">"total"</span><span class="syn-brk">:</span> <span class="syn-num">738</span><span class="syn-brk">,</span></span></div>
+              <div class="code-line"><span class="line-num">15</span><span class="line-body">  <span class="syn-key">"receipt"</span><span class="syn-brk">:</span> <span class="syn-str">"☕ SURF COFFEE — ИТОГО: 738 руб."</span></span></div>
+              <div class="code-line"><span class="line-num">16</span><span class="line-body"><span class="syn-brk">}</span></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tech stack pills -->
+      <div class="flex flex-wrap justify-center gap-3 mt-12">
+        <span class="px-4 py-2 rounded-full glass-card text-xs text-muted font-medium tracking-wide">n8n</span>
+        <span class="px-4 py-2 rounded-full glass-card text-xs text-muted font-medium tracking-wide">OpenRouter</span>
+        <span class="px-4 py-2 rounded-full glass-card text-xs text-muted font-medium tracking-wide">Python</span>
+        <span class="px-4 py-2 rounded-full glass-card text-xs text-muted font-medium tracking-wide">Telegram Bot API</span>
+        <span class="px-4 py-2 rounded-full glass-card text-xs text-muted font-medium tracking-wide">CRM Integration</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Divider -->
+  <div class="max-w-7xl mx-auto px-5 sm:px-8 lg:px-12">
+    <div class="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+  </div>
+
+  <!-- 4. DEVELOPMENT STEPS -->
+  <section id="process" class="reveal relative py-24 lg:py-32">
+    <div class="max-w-7xl mx-auto px-5 sm:px-8 lg:px-12">
+      <div class="text-center mb-14 lg:mb-16">
+        <p class="text-cyan text-xs font-semibold tracking-[0.2em] uppercase mb-4">04 · Процесс</p>
+        <h2 class="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight text-white leading-tight max-w-4xl mx-auto">
+          ЭТАПЫ РАЗРАБОТКИ<br class="hidden sm:block" />
+          <span class="text-cyan">ДЛЯ ВАШЕГО БИЗНЕСА</span>
+        </h2>
+      </div>
+
+      <div class="grid md:grid-cols-3 gap-5 lg:gap-6">
+        <div class="step-card glass-card rounded-2xl p-6 lg:p-8 border border-white/[0.08]">
+          <div class="flex items-center justify-between mb-5">
+            <span class="text-[10px] font-bold tracking-[0.2em] uppercase text-cyan/80">Шаг 1</span>
+            <span class="text-[10px] font-mono text-white/30 px-2.5 py-1 rounded-md border border-white/[0.06] bg-white/[0.03]">1 день</span>
+          </div>
+          <h3 class="text-base lg:text-lg font-semibold text-white mb-3 leading-snug">Анализ процессов и ТЗ</h3>
+          <p class="text-sm text-muted leading-relaxed font-light">
+            Разбираем вашу рутину, ищем узкие места, проектируем архитектуру ИИ-агента.
+          </p>
+        </div>
+
+        <div class="step-card glass-card rounded-2xl p-6 lg:p-8 border border-white/[0.08]">
+          <div class="flex items-center justify-between mb-5">
+            <span class="text-[10px] font-bold tracking-[0.2em] uppercase text-cyan/80">Шаг 2</span>
+            <span class="text-[10px] font-mono text-white/30 px-2.5 py-1 rounded-md border border-white/[0.06] bg-white/[0.03]">1–3 дня</span>
+          </div>
+          <h3 class="text-base lg:text-lg font-semibold text-white mb-3 leading-snug">Разработка и Вайбкодинг</h3>
+          <p class="text-sm text-muted leading-relaxed font-light">
+            Собираем логику в n8n, пишем кастомные скрипты на Python, зашиваем базу данных меню или товаров.
+          </p>
+        </div>
+
+        <div class="step-card glass-card rounded-2xl p-6 lg:p-8 border border-white/[0.08]">
+          <div class="flex items-center justify-between mb-5">
+            <span class="text-[10px] font-bold tracking-[0.2em] uppercase text-cyan/80">Шаг 3</span>
+            <span class="text-[10px] font-mono text-white/30 px-2.5 py-1 rounded-md border border-white/[0.06] bg-white/[0.03]">1 день</span>
+          </div>
+          <h3 class="text-base lg:text-lg font-semibold text-white mb-3 leading-snug">Тестирование и Деплой</h3>
+          <p class="text-sm text-muted leading-relaxed font-light">
+            Привязываем боевого бота к вашему Telegram, проводим тесты без багов и передаём вам ключи управления.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Divider -->
+  <div class="max-w-7xl mx-auto px-5 sm:px-8 lg:px-12">
+    <div class="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+  </div>
+
+  <!-- 5. ROI CALCULATOR -->
+  <section id="roi" class="reveal relative py-24 lg:py-32">
+    <div class="max-w-7xl mx-auto px-5 sm:px-8 lg:px-12">
+      <div class="text-center mb-12 lg:mb-14">
+        <p class="text-cyan text-xs font-semibold tracking-[0.2em] uppercase mb-4">05 · Экономика</p>
+        <h2 class="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight text-white leading-tight max-w-4xl mx-auto">
+          КАЛЬКУЛЯТОР ЭКОНОМИИ<br class="hidden sm:block" />
+          <span class="text-cyan">ДЛЯ ВАШЕГО БИЗНЕСА</span>
+        </h2>
+        <p class="text-muted text-sm sm:text-base max-w-xl mx-auto mt-5 font-light leading-relaxed">
+          Подвиньте ползунок — и увидите, сколько времени и денег сэкономит ИИ-бариста уже в первый месяц.
+        </p>
+      </div>
+
+      <div class="roi-widget gradient-border rounded-3xl max-w-3xl mx-auto">
+        <div class="glass-card rounded-3xl p-6 sm:p-10 lg:p-12">
+          <div class="mb-10">
+            <div class="flex items-end justify-between mb-4">
+              <label for="orders-slider" class="text-sm font-medium text-white">Заказов в день</label>
+              <span id="orders-value" class="text-3xl sm:text-4xl font-bold text-cyan roi-value tabular-nums">50</span>
+            </div>
+            <input
+              type="range"
+              id="orders-slider"
+              class="roi-slider"
+              min="10"
+              max="500"
+              step="10"
+              value="50"
+              aria-label="Количество заказов в день"
+            />
+            <div class="flex justify-between mt-2 text-[10px] text-white/25 font-mono">
+              <span>10</span>
+              <span>500</span>
+            </div>
+          </div>
+
+          <div class="grid sm:grid-cols-2 gap-4 lg:gap-5">
+            <div class="roi-stat rounded-2xl p-5 lg:p-6 text-center">
+              <p class="text-[10px] uppercase tracking-[0.15em] text-muted mb-3">Сэкономлено времени</p>
+              <p class="text-3xl sm:text-4xl font-bold text-white roi-value tabular-nums" id="hours-saved">125</p>
+              <p class="text-xs text-cyan/80 mt-1">часов в месяц</p>
+              <p class="text-[10px] text-white/25 mt-3 font-light">5 мин × заказ × 30 дней</p>
+            </div>
+            <div class="roi-stat rounded-2xl p-5 lg:p-6 text-center">
+              <p class="text-[10px] uppercase tracking-[0.15em] text-muted mb-3">Дополнительная прибыль</p>
+              <p class="text-3xl sm:text-4xl font-bold text-white roi-value tabular-nums" id="profit-saved">225 000</p>
+              <p class="text-xs text-cyan/80 mt-1">руб. в месяц</p>
+              <p class="text-[10px] text-white/25 mt-3 font-light">+150 ₽ к чеку × 24/7 допродажи</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Divider -->
+  <div class="max-w-7xl mx-auto px-5 sm:px-8 lg:px-12">
+    <div class="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+  </div>
+
+  <!-- 6. FAQ -->
+  <section id="faq" class="reveal relative py-24 lg:py-32">
+    <div class="max-w-3xl mx-auto px-5 sm:px-8 lg:px-12">
+      <div class="text-center mb-12 lg:mb-14">
+        <p class="text-cyan text-xs font-semibold tracking-[0.2em] uppercase mb-4">06 · FAQ</p>
+        <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-white">
+          ЧАСТО ЗАДАВАЕМЫЕ <span class="text-cyan">ВОПРОСЫ</span>
+        </h2>
+      </div>
+
+      <div class="space-y-3" id="faq-list">
+        <div class="faq-item glass-card rounded-2xl border border-white/[0.08] overflow-hidden">
+          <button type="button" class="faq-trigger w-full flex items-center justify-between gap-4 p-5 sm:p-6 text-left" aria-expanded="false">
+            <span class="text-sm sm:text-base font-medium text-white leading-snug">Сколько стоят сервера и обслуживание?</span>
+            <svg class="faq-icon w-5 h-5 text-cyan shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          <div class="faq-panel">
+            <div class="faq-panel-inner">
+              <p class="px-5 sm:px-6 pb-5 sm:pb-6 text-sm text-muted leading-relaxed font-light border-t border-white/[0.05] pt-4">
+                Сама платформа n8n работает на бесплатных лимитах или дешёвом облаке за $5 в месяц. Никаких скрытых платежей.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item glass-card rounded-2xl border border-white/[0.08] overflow-hidden">
+          <button type="button" class="faq-trigger w-full flex items-center justify-between gap-4 p-5 sm:p-6 text-left" aria-expanded="false">
+            <span class="text-sm sm:text-base font-medium text-white leading-snug">Как бот реагирует на сложные или нестандартные вопросы?</span>
+            <svg class="faq-icon w-5 h-5 text-cyan shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          <div class="faq-panel">
+            <div class="faq-panel-inner">
+              <p class="px-5 sm:px-6 pb-5 sm:pb-6 text-sm text-muted leading-relaxed font-light border-t border-white/[0.05] pt-4">
+                ИИ-агент удерживает контекст и роль. Если клиент пишет бред или просит то, чего нет в меню, робот вежливо возвращает его к заказу или зовёт живого администратора.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item glass-card rounded-2xl border border-white/[0.08] overflow-hidden">
+          <button type="button" class="faq-trigger w-full flex items-center justify-between gap-4 p-5 sm:p-6 text-left" aria-expanded="false">
+            <span class="text-sm sm:text-base font-medium text-white leading-snug">Можно ли интегрировать бота с моей кассой (iiko / Poster / МойСклад)?</span>
+            <svg class="faq-icon w-5 h-5 text-cyan shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          <div class="faq-panel">
+            <div class="faq-panel-inner">
+              <p class="px-5 sm:px-6 pb-5 sm:pb-6 text-sm text-muted leading-relaxed font-light border-t border-white/[0.05] pt-4">
+                Да, монолитная архитектура n8n позволяет по API связать бота с любой современной системой учёта и CRM.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7. FOOTER / CTA -->
+  <footer id="contact" class="relative py-24 lg:py-32">
+    <div class="absolute inset-0 bg-gradient-to-t from-cyan/[0.04] via-transparent to-transparent pointer-events-none"></div>
+    <div class="max-w-7xl mx-auto px-5 sm:px-8 lg:px-12 relative">
+      <div class="gradient-border rounded-[2rem] lg:rounded-[2.5rem]">
+        <div class="glass-card rounded-[2rem] lg:rounded-[2.5rem] px-6 sm:px-12 lg:px-20 py-16 lg:py-24 text-center relative overflow-hidden">
+          <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[300px] bg-cyan/8 rounded-full blur-[100px] pointer-events-none"></div>
+
+          <p class="text-cyan text-xs font-semibold tracking-[0.25em] uppercase mb-6 relative">07 · Сотрудничество</p>
+
+          <h2 class="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold tracking-tight text-white leading-tight mb-6 relative max-w-3xl mx-auto">
+            Хотите автоматизировать<br class="hidden sm:block" />
+            ваш бизнес <span class="text-cyan">под ключ</span>?
+          </h2>
+
+          <p class="text-muted text-sm sm:text-base max-w-xl mx-auto mb-12 font-light leading-relaxed relative">
+            Разрабатываю AI-агентов, автоматизации на n8n и кастомные интеграции
+            для e-commerce, HoReCa и сервисного бизнеса.
+          </p>
+
+          <div class="relative flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-5">
+            <a href="https://t.me/nstnoiree" target="_blank" rel="noopener noreferrer"
+               class="btn-neon btn-cta w-full sm:w-auto relative inline-flex items-center justify-center gap-4 rounded-2xl bg-gradient-to-r from-cyan/25 to-cyan/10 border-2 border-cyan/50 text-white font-bold uppercase shadow-neon-cyan">
+              <svg class="w-6 h-6 text-cyan shrink-0" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+              </svg>
+              Написать в Telegram
+            </a>
+            <a href="https://kwork.ru/user/nstrvv" target="_blank" rel="noopener noreferrer"
+               class="btn-neon btn-cta w-full sm:w-auto relative inline-flex items-center justify-center gap-4 rounded-2xl bg-gradient-to-r from-coffee/25 to-coffee/10 border-2 border-coffee-light/50 text-white font-bold uppercase">
+              <svg class="w-6 h-6 text-coffee-light shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              Обсудить на Kwork
+            </a>
+          </div>
+
+          <div class="mt-16 pt-8 border-t border-white/[0.06] flex flex-col sm:flex-row items-center justify-between gap-4 relative">
+            <div class="flex items-center gap-2.5">
+              <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-cyan/30 to-coffee/30 border border-white/10 flex items-center justify-center">
+                <svg class="w-3.5 h-3.5 text-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <span class="text-xs text-muted">Surf Coffee AI · Case Study</span>
+            </div>
+            <p class="text-xs text-white/25">&copy; 2026 · Все права защищены</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    document.querySelectorAll('.flow-node').forEach(function (node) {
+      node.addEventListener('click', function () {
+        document.querySelectorAll('.flow-node').forEach(function (n) { n.classList.remove('active'); });
+        node.classList.add('active');
+      });
+    });
+
+    var revealObserver = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) entry.target.classList.add('visible');
+      });
+    }, { threshold: 0.12 });
+    document.querySelectorAll('.reveal').forEach(function (el) { revealObserver.observe(el); });
+
+    document.addEventListener('mousemove', function (e) {
+      document.body.style.setProperty('--mouse-x', (e.clientX / window.innerWidth * 100) + '%');
+      document.body.style.setProperty('--mouse-y', (e.clientY / window.innerHeight * 100) + '%');
+    });
+
+    /* ROI Calculator */
+    var ordersSlider = document.getElementById('orders-slider');
+    var ordersValue = document.getElementById('orders-value');
+    var hoursSaved = document.getElementById('hours-saved');
+    var profitSaved = document.getElementById('profit-saved');
+
+    function formatProfit(n) {
+      return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    }
+
+    function bumpEl(el) {
+      el.classList.add('bump');
+      setTimeout(function () { el.classList.remove('bump'); }, 300);
+    }
+
+    function updateRoi() {
+      var orders = parseInt(ordersSlider.value, 10);
+      var hours = Math.round(orders * 5 * 30 / 60);
+      var profit = orders * 150 * 30;
+
+      ordersValue.textContent = orders;
+      hoursSaved.textContent = hours;
+      profitSaved.textContent = formatProfit(profit);
+
+      var pct = ((orders - 10) / (500 - 10)) * 100;
+      ordersSlider.style.setProperty('--roi-pct', pct + '%');
+
+      bumpEl(hoursSaved);
+      bumpEl(profitSaved);
+    }
+
+    if (ordersSlider) {
+      ordersSlider.addEventListener('input', updateRoi);
+      updateRoi();
+    }
+
+    /* FAQ Accordion */
+    document.querySelectorAll('.faq-trigger').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var item = btn.closest('.faq-item');
+        var isOpen = item.classList.contains('open');
+
+        document.querySelectorAll('.faq-item').forEach(function (el) {
+          el.classList.remove('open');
+          el.querySelector('.faq-trigger').setAttribute('aria-expanded', 'false');
+        });
+
+        if (!isOpen) {
+          item.classList.add('open');
+          btn.setAttribute('aria-expanded', 'true');
+        }
+      });
+    });
+  </script>
+</body>
+</html>
